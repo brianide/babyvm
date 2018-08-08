@@ -1,46 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-
-#define STACK_MAX 256
-#define GC_THRESHOLD 20 
-
-typedef enum
-{
-	OBJ_INT,
-	OBJ_PAIR
-} ObjectType;
-
-typedef struct sObject
-{
-	struct sObject* next;
-
-	unsigned char marked;
-	ObjectType type;
-
-	union
-	{
-		// INT
-		int value;
-
-		// PAIR
-		struct
-		{
-			struct sObject* car;
-			struct sObject* cdr;
-		};
-	};
-} Object;
-
-typedef struct
-{
-	Object* stack[STACK_MAX];
-	Object* firstObject;
-	int stackSize;
-
-	int numObjects;
-	int maxObjects;
-} VM;
+#include "main.h"
 
 VM* newVM()
 {
@@ -52,53 +13,6 @@ VM* newVM()
 	vm->maxObjects = GC_THRESHOLD;
 
 	return vm;
-}
-
-void push(VM* vm, Object* value)
-{
-	assert(vm->stackSize < STACK_MAX && "Stack overflow");
-	vm->stack[vm->stackSize++] = value;
-}
-
-Object* pop(VM* vm)
-{
-	assert(vm->stackSize > 0 && "Stack underflow");
-	return vm->stack[--vm->stackSize];
-}
-
-void gc(VM*);
-
-Object* newObject(VM* vm, ObjectType type)
-{
-	if(vm->numObjects == vm->maxObjects)
-		gc(vm);
-
-	Object* object = malloc(sizeof(Object));
-	object->type = type;
-	object->marked = 0;
-
-	object->next = vm->firstObject;
-	vm->firstObject = object;
-
-	vm->numObjects++;
-	return object;
-}
-
-void pushInt(VM* vm, int value)
-{
-	Object* object = newObject(vm, OBJ_INT);
-	object->value = value;
-	push(vm, object);
-}
-
-Object* pushPair(VM* vm)
-{
-	Object* object = newObject(vm, OBJ_PAIR);
-	object->cdr = pop(vm);
-	object->car = pop(vm);
-
-	push(vm, object);
-	return object;
 }
 
 void mark(Object* obj)
@@ -152,21 +66,49 @@ void gc(VM* vm)
 	vm->maxObjects = vm->numObjects * 2;
 }
 
-void debugPrintObject(Object* obj)
+Object* newObject(VM* vm, ObjectType type)
 {
-	switch(obj->type)
-	{
-		case OBJ_INT:
-			printf("%d", obj->value);
-			break;
-		case OBJ_PAIR:
-			printf("[ ");
-			debugPrintObject(obj->car);
-			printf(" ");
-			debugPrintObject(obj->cdr);
-			printf(" ]");
-			break;
-	}
+	if(vm->numObjects == vm->maxObjects)
+		gc(vm);
+
+	Object* object = malloc(sizeof(Object));
+	object->type = type;
+	object->marked = 0;
+
+	object->next = vm->firstObject;
+	vm->firstObject = object;
+
+	vm->numObjects++;
+	return object;
+}
+
+void push(VM* vm, Object* value)
+{
+	assert(vm->stackSize < STACK_MAX && "Stack overflow");
+	vm->stack[vm->stackSize++] = value;
+}
+
+Object* pop(VM* vm)
+{
+	assert(vm->stackSize > 0 && "Stack underflow");
+	return vm->stack[--vm->stackSize];
+}
+
+void pushInt(VM* vm, int value)
+{
+	Object* object = newObject(vm, OBJ_INT);
+	object->value = value;
+	push(vm, object);
+}
+
+Object* pushPair(VM* vm)
+{
+	Object* object = newObject(vm, OBJ_PAIR);
+	object->cdr = pop(vm);
+	object->car = pop(vm);
+
+	push(vm, object);
+	return object;
 }
 
 void debugPrint(VM* vm)
@@ -182,6 +124,23 @@ void debugPrint(VM* vm)
 		printf("\n");
 	}
 	printf("==============\n");
+}
+
+void debugPrintObject(Object* obj)
+{
+	switch(obj->type)
+	{
+		case OBJ_INT:
+			printf("%d", obj->value);
+			break;
+		case OBJ_PAIR:
+			printf("[ ");
+			debugPrintObject(obj->car);
+			printf(" ");
+			debugPrintObject(obj->cdr);
+			printf(" ]");
+			break;
+	}
 }
 
 int main(int argc, char** argv)
